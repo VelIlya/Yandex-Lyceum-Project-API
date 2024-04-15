@@ -1,5 +1,5 @@
 from telegram.ext import Application, MessageHandler, filters, CommandHandler
-from telegram import ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, KeyboardButton
 from googletrans import Translator
 
 import math
@@ -7,9 +7,9 @@ import datetime
 from datetime import timezone, timedelta
 import requests
 
-BOT_TOKEN = '7143877690:AAGtv2o-4cewOCZJPQm0y8zNEEeN0RjLW7c'
-OpenWeather_TOKEN = '9a5b786988890f430d5325e3d72b7a6c'
-Geocoder_TOKEN = 'pk.605ebaf9f9d2ce2e84559af15a384ad1'
+BOT_TOKEN = ''
+OpenWeather_TOKEN = ''
+Geocoder_TOKEN = ''
 
 code_to_smile = {
     "Clear": "Ясно \U00002600",
@@ -20,44 +20,96 @@ code_to_smile = {
     "Snow": "Снег \U0001F328",
     "Mist": "Туман \U0001F32B"
 }
-
 translator = Translator()
 LANGUAGES = {
     'русского': 'ru', 'русский': 'ru',
     'английского': 'en', 'английский': 'en'
 }
 
-reply_keyboard_start = [['/help', '/translation']]
-markup_start = ReplyKeyboardMarkup(reply_keyboard_start, one_time_keyboard=False)
-reply_keyboard_stop = [['/stop']]
-markup_stop = ReplyKeyboardMarkup(reply_keyboard_stop, one_time_keyboard=False)
+
+def get_keyboard():
+    wether_button = KeyboardButton('☀Моя погода☀', request_location=True)
+    my_keboard = ReplyKeyboardMarkup([['🙏Помощь🙏'], [wether_button]], resize_keyboard=True)
+    return my_keboard
 
 
 async def start(update, context):
     """Отправляет сообщение когда получена команда /start"""
     user = update.effective_user
     await update.message.reply_html(
-        rf"Привет {user.mention_html()}! Я бот-помошник для путешествий...",
-        reply_markup=markup_start
-    )
+        f"👋👋👋Привет {user.mention_html()}! Я бот-помошник для путешествий...\n\n\n❓Чтобы подробнее узнать о моих "
+        f"функциях используйте команду /help или нажмите на кнопку «Помошь»❓.",
+        reply_markup=get_keyboard())
 
 
 async def help_command(update, context):
     """Отправляет сообщение когда получена команда /help"""
-    await update.message.reply_text("Я пока не умею помогать...")
+    await update.message.reply_html(
+        "❗В данном сообщении вы можете узнать о всём функционале бота❗\n\n\n"
+        "🔸<u><b>Карманный переводчик</b></u>\n"
+        "Чтобы получить перевод любого слова или фразы отправте мне собщение со следующим "
+        "содержанием:\n<b>Переведи с</b> <i>язык переводимой фразы</i> <b>на</b> <i>язык "
+        "результата</i> ...\nПример: Переведи с русского на английский Пирвет мир!\n\n\n"
+        "🔸<u><b>Синоптик</b></u>\n"
+        "Если вы хотите узнать текущую погоду в городе вашего прибывания нажмите на кнопку "
+        "«Моя погода», при этом в чат будет отправлена информация о вашей геолокации.\n\n"
+        "Если вас интересует погода в конкретном городе, то отправте мне собщение со "
+        "следующим содержанием:\n<b>Погода в городе</b> <i>название города</i>\nПример: "
+        "Погода в городе Москва", reply_markup=get_keyboard())
 
 
-def geocoder(latitude, longitude):
+def wether(city):
+    global code_to_smile
+
+    response = requests.get(
+        f"http://api.openweathermap.org/data/2.5/weather?q={city}&lang=ru&units=metric&appid={OpenWeather_TOKEN}")
+    data = response.json()
+    city = data["name"]
+    cur_temp = data["main"]["temp"]
+    humidity = data["main"]["humidity"]
+    pressure = data["main"]["pressure"]
+    wind = data["wind"]["speed"]
+
+    # продолжительность дня
+    length_of_the_day = datetime.datetime.fromtimestamp(
+        data["sys"]["sunset"]) - datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
+
+    weather_description = data["weather"][0]["main"]
+
+    time_zone = data["timezone"]
+
+    tz = timezone(timedelta(seconds=time_zone))
+
+    if weather_description in code_to_smile:
+        wd = code_to_smile[weather_description]
+    else:
+        # если эмодзи для погоды нет, выводим другое сообщение
+        wd = "Посмотри в окно, я не понимаю, что там за погода..."
+    return f"⌚{datetime.datetime.now(tz).strftime('%d-%m-%Y %H:%M')}\n\n" \
+           f"🟠<u><b>Погода в городе {city}</b></u>🟠\n\n" \
+           f"🌡Температура: {cur_temp}°C {wd}\n" \
+           f"💧Влажность: {humidity}%\n" \
+           f"🌍Давление: {math.ceil(pressure / 1.333)} мм.рт.ст\n" \
+           f"💨Ветер: {wind} м/с \n" \
+           f"🌘Продолжительность дня: {length_of_the_day}"
+
+
+async def my_wether(update, context):
     global Geocoder_TOKEN
+    Location = str(update.message.location).split('Location(latitude=')
+    Location = Location[1].split(', longitude=')
+    latitude, longitude = Location[0], Location[1]
+
     headers = {"Accept-Language": "ru"}
     address = requests.get(
-        f'https://eu1.locationiq.com/v1/reverse.php?key={Geocoder_TOKEN}&lat={latitude}&lon={longitude}&format=json',
+        f'https://eu1.locationiq.com/v1/reverse.php?key={Geocoder_TOKEN}&lat={latitude}&lon={longitude[:-1]}'
+        f'&format=json',
         headers=headers).json()
-    return f'Твое местоположение: {address.get("display_name")}'
+    await update.message.reply_html(wether(address["address"].get("city")))
 
 
 async def echo(update, context):
-    global translator, LANGUAGES, code_to_smile
+    global translator, LANGUAGES
     if 'Переведи' in update.message.text:
         try:
             src = LANGUAGES[update.message.text.split()[2]]
@@ -73,38 +125,7 @@ async def echo(update, context):
     elif 'Погода в городе' in update.message.text:
         try:
             city = update.message.text.split('Погода в городе ')[-1]
-
-            response = requests.get(
-                f"http://api.openweathermap.org/data/2.5/weather?q={city}&lang=ru&units=metric&appid={OpenWeather_TOKEN}")
-            data = response.json()
-            city = data["name"]
-            cur_temp = data["main"]["temp"]
-            humidity = data["main"]["humidity"]
-            pressure = data["main"]["pressure"]
-            wind = data["wind"]["speed"]
-
-            # продолжительность дня
-            length_of_the_day = datetime.datetime.fromtimestamp(
-                data["sys"]["sunset"]) - datetime.datetime.fromtimestamp(data["sys"]["sunrise"])
-
-            weather_description = data["weather"][0]["main"]
-
-            time_zone = data["timezone"]
-
-            tz = timezone(timedelta(seconds=time_zone))
-
-            if weather_description in code_to_smile:
-                wd = code_to_smile[weather_description]
-            else:
-                # если эмодзи для погоды нет, выводим другое сообщение
-                wd = "Посмотри в окно, я не понимаю, что там за погода..."
-
-            await update.message.reply_text(
-                f"{datetime.datetime.now(tz).strftime('%d-%m-%Y %H:%M')}\nПогода в городе {city}:\n"
-                f"Температура: {cur_temp}°C {wd}\nВлажность: {humidity}%\n"
-                f"Давление: {math.ceil(pressure / 1.333)} мм.рт.ст\n"
-                f"Ветер: {wind} м/с \n"
-                f"Продолжительность дня: {length_of_the_day}")
+            await update.message.reply_html(wether(city))
 
         except Exception as error:
             print(error)
@@ -119,9 +140,9 @@ def main():
     # Регистрация комманд.
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-
-    text_handler = MessageHandler(filters.TEXT, echo)
-    application.add_handler(text_handler)
+    application.add_handler(MessageHandler(filters.Regex('🙏Помощь🙏'), help_command))
+    application.add_handler(MessageHandler(filters.LOCATION, my_wether))
+    application.add_handler(MessageHandler(filters.TEXT, echo))
 
     # Запускаем приложение.
     application.run_polling()
