@@ -7,9 +7,13 @@ import datetime
 from datetime import timezone, timedelta
 import requests
 
-BOT_TOKEN = ''
-OpenWeather_TOKEN = ''
-Geocoder_TOKEN = ''
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+OpenWeather_TOKEN = os.getenv('OPENWEATHER_TOKEN')
+Geocoder_TOKEN = os.getenv('GEOCODER_TOKEN')
 
 code_to_smile = {
     "Clear": "Ясно \U00002600",
