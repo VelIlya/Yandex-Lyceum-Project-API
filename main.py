@@ -1,7 +1,7 @@
 from telegram.ext import Application, MessageHandler, filters, CommandHandler
-
+import os
 # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен.
-BOT_TOKEN = 'TOKEN'
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 
 async def start(update, context):
