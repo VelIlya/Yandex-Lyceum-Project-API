@@ -1,6 +1,8 @@
 from telegram.ext import Application, MessageHandler, filters, CommandHandler
+import requests
+from dotenv import load_dotenv
 import os
-# Вместо слова "TOKEN" надо разместить полученный от @BotFather токен.
+load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 
